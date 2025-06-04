@@ -14,8 +14,11 @@ public class EnemySpawner : MonoBehaviour
     public Image level_selector;
     public GameObject button;
     public GameObject continueButton;
+    public GameObject restartButton;
     public TextMeshProUGUI waveInfoText;
     public TextMeshProUGUI levelInfoText;
+    public GameObject gameOverPanel;
+    public GameObject victoryPanel;
     
     [Header("Game References")]
     public GameObject enemy;
@@ -36,6 +39,18 @@ public class EnemySpawner : MonoBehaviour
     {
         LoadGameData();
         SetupLevelSelection();
+        InitializeUI();
+    }
+
+    void InitializeUI()
+    {
+        // Hide game over and victory panels initially
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
+        if (victoryPanel != null)
+            victoryPanel.SetActive(false);
+        if (restartButton != null)
+            restartButton.SetActive(false);
     }
 
     void LoadGameData()
@@ -93,6 +108,8 @@ public class EnemySpawner : MonoBehaviour
 
     public void StartLevel(string levelname)
     {
+        Debug.Log($"Starting level: {levelname}");
+        
         currentLevel = levels.FirstOrDefault(l => l.name == levelname);
         if (currentLevel == null)
         {
@@ -100,32 +117,73 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
+        // Reset all game state
         currentWave = 1;
         gameInProgress = true;
         waitingForContinue = false;
         
+        // Hide level selector and all game UI
         level_selector.gameObject.SetActive(false);
+        HideAllGameUI();
+        
+        // Reset GameManager state
+        GameManager.Instance.state = GameManager.GameState.PREGAME;
+        
+        // Make sure wave UI is visible and reset
+        InitializeGameUI();
+        
+        // Start the player
         GameManager.Instance.player.GetComponent<PlayerController>().StartLevel();
         
+        Debug.Log($"Starting level coroutine for {levelname}, wave 1");
         StartCoroutine(RunLevel());
+    }
+
+    void InitializeGameUI()
+    {
+        Debug.Log("Initializing game UI for new run");
+        
+        // Make sure wave info text is active and ready
+        if (waveInfoText != null)
+        {
+            waveInfoText.gameObject.SetActive(true);
+            waveInfoText.text = "Preparing...";
+        }
+        
+        // Hide other UI elements that shouldn't be shown at start
+        if (levelInfoText != null)
+            levelInfoText.gameObject.SetActive(false);
+        if (continueButton != null)
+            continueButton.SetActive(false);
+        if (restartButton != null)
+            restartButton.SetActive(false);
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
+        if (victoryPanel != null)
+            victoryPanel.SetActive(false);
     }
 
     IEnumerator RunLevel()
     {
+        Debug.Log($"RunLevel started for {currentLevel.name}");
+        
         while (gameInProgress)
         {
+            Debug.Log($"Starting wave {currentWave}");
             yield return StartCoroutine(SpawnWave());
             
             // Wait for all enemies to be defeated
             yield return new WaitWhile(() => GameManager.Instance.enemy_count > 0);
             
             GameManager.Instance.state = GameManager.GameState.WAVEEND;
+            Debug.Log($"Wave {currentWave} completed");
             
-            // Check win condition
+            // Check win condition for Easy and Medium modes
             if (currentLevel.waves > 0 && currentWave >= currentLevel.waves)
             {
-                yield return StartCoroutine(ShowVictoryScreen());
-                break;
+                Debug.Log($"Level {currentLevel.name} completed!");
+                ShowVictoryScreen();
+                yield break; // Exit the level loop
             }
             
             // Show wave completion screen and wait for continue
@@ -272,11 +330,12 @@ public class EnemySpawner : MonoBehaviour
     {
         waitingForContinue = true;
         
-        // Enable continue button and show wave info
+        // Enable continue button
         if (continueButton != null)
             continueButton.SetActive(true);
             
-        if (waveInfoText != null)
+        // Show wave completion info in levelInfoText (NOT waveInfoText)
+        if (levelInfoText != null)
         {
             string waveText = $"Wave {currentWave} Complete!\n";
             waveText += $"Enemies Defeated: {GetEnemiesDefeatedThisWave()}\n";
@@ -284,9 +343,17 @@ public class EnemySpawner : MonoBehaviour
             
             if (currentLevel.waves > 0)
                 waveText += $" / {currentLevel.waves}";
+            else
+                waveText += " (Endless)";
                 
-            waveInfoText.text = waveText;
-            waveInfoText.gameObject.SetActive(true);
+            levelInfoText.text = waveText;
+            levelInfoText.gameObject.SetActive(true);
+        }
+        
+        // Keep waveInfoText active but show wave end status
+        if (waveInfoText != null)
+        {
+            waveInfoText.text = "Wave Complete - Click Continue";
         }
     }
 
@@ -308,57 +375,187 @@ public class EnemySpawner : MonoBehaviour
         return total;
     }
 
-    IEnumerator ShowVictoryScreen()
-    {
-        if (levelInfoText != null)
-        {
-            levelInfoText.text = $"Victory!\nYou completed {currentLevel.name} mode!\nWaves Survived: {currentWave}";
-            levelInfoText.gameObject.SetActive(true);
-        }
-        
-        yield return new WaitForSeconds(3f);
-        
-        ReturnToMenu();
-    }
-
     public void ShowGameOver()
     {
-        gameInProgress = false;
+        Debug.Log("ShowGameOver() called!");
         
+        gameInProgress = false;
+        GameManager.Instance.state = GameManager.GameState.GAMEOVER;
+        
+        string gameOverMessage = GetGameOverMessage();
+        Debug.Log($"Game Over Message: {gameOverMessage}");
+
+        // Show game over message
         if (levelInfoText != null)
         {
-            levelInfoText.text = $"Game Over!\nWaves Survived: {currentWave}\nLevel: {currentLevel.name}";
+            levelInfoText.text = gameOverMessage;
             levelInfoText.gameObject.SetActive(true);
         }
+
+        // Show restart button
+        if (restartButton != null)
+        {
+            restartButton.SetActive(true);
+        }
+
+        // Show game over panel if available
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(true);
+        }
+    }
+
+    void ShowVictoryScreen()
+    {
+        gameInProgress = false;
+        GameManager.Instance.state = GameManager.GameState.GAMEOVER;
         
-        StartCoroutine(GameOverDelay());
+        string victoryMessage = GetVictoryMessage();
+
+        // Show victory message
+        if (levelInfoText != null)
+        {
+            levelInfoText.text = victoryMessage;
+            levelInfoText.gameObject.SetActive(true);
+        }
+
+        // Show restart button
+        if (restartButton != null)
+        {
+            restartButton.SetActive(true);
+        }
+
+        // Show victory panel if available
+        if (victoryPanel != null)
+        {
+            victoryPanel.SetActive(true);
+        }
     }
 
-    IEnumerator GameOverDelay()
+    string GetGameOverMessage()
     {
-        yield return new WaitForSeconds(3f);
-        ReturnToMenu();
+        if (currentLevel == null)
+            return "💀 GAME OVER 💀\n\nTry again!";
+            
+        if (currentLevel.name == "Easy")
+        {
+            return $"💀 GAME OVER 💀\n\n" +
+                   $"Waves Survived: {currentWave} / {currentLevel.waves}\n\n" +
+                   $"Keep trying! You'll get better each time.";
+        }
+        else if (currentLevel.name == "Medium")
+        {
+            return $"💀 DEFEATED 💀\n\n" +
+                   $"Waves Survived: {currentWave} / {currentLevel.waves}\n\n" +
+                   $"Medium mode is tough! Try again?";
+        }
+        else // Endless
+        {
+            return $"💀 ENDLESS WARRIOR FALLEN 💀\n\n" +
+                   $"Waves Survived: {currentWave}\n\n" +
+                   $"Can you survive even longer?";
+        }
     }
 
-    void ReturnToMenu()
+    string GetVictoryMessage()
     {
+        if (currentLevel.name == "Easy")
+        {
+            return $"🎉 VICTORY! 🎉\n\n" +
+                   $"You completed Easy Mode!\n" +
+                   $"Waves: {currentWave} / {currentLevel.waves}\n\n" +
+                   $"Try Medium or Endless mode!";
+        }
+        else if (currentLevel.name == "Medium")
+        {
+            return $"🏆 AMAZING! 🏆\n\n" +
+                   $"You mastered Medium Mode!\n" +
+                   $"Waves: {currentWave} / {currentLevel.waves}\n\n" +
+                   $"Ready for Endless mode?";
+        }
+        return "🎉 VICTORY! 🎉";
+    }
+
+    public void RestartGame()
+    {
+        Debug.Log("RestartGame() called - performing complete reset");
+        
+        // Stop all coroutines to prevent any lingering processes
+        StopAllCoroutines();
+        
+        // Clear all enemies from the game
+        var allEnemies = FindObjectsOfType<EnemyController>();
+        foreach (var enemy in allEnemies)
+        {
+            if (enemy != null)
+            {
+                GameManager.Instance.RemoveEnemy(enemy.gameObject);
+                Destroy(enemy.gameObject);
+            }
+        }
+        
+        // Reset ALL game state
         gameInProgress = false;
         waitingForContinue = false;
         currentWave = 0;
         currentLevel = null;
         
+        // Reset GameManager state properly
         GameManager.Instance.state = GameManager.GameState.PREGAME;
+        GameManager.Instance.countdown = 0;
         
-        // Hide info texts
+        // Hide ALL UI elements immediately
+        HideAllGameUI();
+        
+        // Reset any UI controllers that might be cached
+        ResetUIControllers();
+        
+        // Show level selector immediately
+        level_selector.gameObject.SetActive(true);
+        
+        Debug.Log("Complete restart finished - ready for new game");
+    }
+
+    void ResetUIControllers()
+    {
+        // Find and reset any UI controllers that might have cached state
+        var waveLabels = FindObjectsOfType<WaveLabelController>();
+        foreach (var waveLabel in waveLabels)
+        {
+            if (waveLabel != null)
+            {
+                // Force the wave label to refresh by disabling and re-enabling
+                waveLabel.gameObject.SetActive(false);
+                waveLabel.gameObject.SetActive(true);
+            }
+        }
+        
+        Debug.Log($"Reset {waveLabels.Length} wave label controllers");
+    }
+
+    void HideAllGameUI()
+    {
+        Debug.Log("Hiding all game UI elements");
+        
+        // Only hide waveInfoText when completely exiting the game
         if (waveInfoText != null)
             waveInfoText.gameObject.SetActive(false);
         if (levelInfoText != null)
             levelInfoText.gameObject.SetActive(false);
         if (continueButton != null)
             continueButton.SetActive(false);
-            
-        // Show level selector
-        level_selector.gameObject.SetActive(true);
+        if (restartButton != null)
+            restartButton.SetActive(false);
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
+        if (victoryPanel != null)
+            victoryPanel.SetActive(false);
+    }
+
+    void ReturnToMenu()
+    {
+        // This method now just calls RestartGame for simplicity
+        RestartGame();
     }
 
     // Called by continue button - this is what the UI calls
@@ -366,11 +563,18 @@ public class EnemySpawner : MonoBehaviour
     {
         Debug.Log("NextWave button pressed!");
         
-        // Hide UI elements
+        // Hide continue button and wave completion message
         if (continueButton != null)
             continueButton.SetActive(false);
+        if (levelInfoText != null)
+            levelInfoText.gameObject.SetActive(false);
+            
+        // Keep waveInfoText active and update it
         if (waveInfoText != null)
-            waveInfoText.gameObject.SetActive(false);
+        {
+            waveInfoText.text = "Preparing next wave...";
+            // DON'T hide waveInfoText - it needs to stay active for countdown and enemy count
+        }
             
         // Signal that we can continue
         waitingForContinue = false;

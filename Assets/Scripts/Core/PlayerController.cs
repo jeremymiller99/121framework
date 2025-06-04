@@ -17,6 +17,7 @@ public class PlayerController : MonoBehaviour
     public int speed;
 
     public Unit unit;
+    private bool isDead = false; // Prevent multiple death calls
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -27,6 +28,10 @@ public class PlayerController : MonoBehaviour
 
     public void StartLevel()
     {
+        Debug.Log("PlayerController StartLevel() called");
+        
+        isDead = false; // Reset death state when starting a new level
+        
         spellcaster = new SpellCaster(125, 8, Hittable.Team.PLAYER);
         StartCoroutine(spellcaster.ManaRegeneration());
         
@@ -34,10 +39,26 @@ public class PlayerController : MonoBehaviour
         hp.OnDeath += Die;
         hp.team = Hittable.Team.PLAYER;
 
-        // tell UI elements what to show
-        healthui.SetHealth(hp);
-        manaui.SetSpellCaster(spellcaster);
-        spellui.SetSpell(spellcaster.spell);
+        // tell UI elements what to show - ensure they're active first
+        if (healthui != null)
+        {
+            healthui.gameObject.SetActive(true);
+            healthui.SetHealth(hp);
+        }
+        
+        if (manaui != null)
+        {
+            manaui.gameObject.SetActive(true);
+            manaui.SetSpellCaster(spellcaster);
+        }
+        
+        if (spellui != null)
+        {
+            spellui.gameObject.SetActive(true);
+            spellui.SetSpell(spellcaster.spell);
+        }
+        
+        Debug.Log("PlayerController initialization complete");
     }
 
     // Update is called once per frame
@@ -63,14 +84,23 @@ public class PlayerController : MonoBehaviour
 
     void Die()
     {
-        Debug.Log("You Lost");
+        // Prevent multiple death calls
+        if (isDead) return;
+        isDead = true;
+        
+        Debug.Log("Player Die() method called - You Lost");
         GameManager.Instance.state = GameManager.GameState.GAMEOVER;
         
         // Find and notify the EnemySpawner
         var enemySpawner = FindObjectOfType<EnemySpawner>();
         if (enemySpawner != null)
         {
+            Debug.Log("EnemySpawner found, calling ShowGameOver()");
             enemySpawner.ShowGameOver();
+        }
+        else
+        {
+            Debug.LogError("EnemySpawner not found! Cannot show game over screen.");
         }
     }
 
