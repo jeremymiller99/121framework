@@ -64,6 +64,14 @@ public class PlayerController : MonoBehaviour
     void Die()
     {
         Debug.Log("You Lost");
+        GameManager.Instance.state = GameManager.GameState.GAMEOVER;
+        
+        // Find and notify the EnemySpawner
+        var enemySpawner = FindObjectOfType<EnemySpawner>();
+        if (enemySpawner != null)
+        {
+            enemySpawner.ShowGameOver();
+        }
     }
 
 }

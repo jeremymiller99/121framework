@@ -19,6 +19,13 @@
        "hp": 30,
        "speed": 7,
        "damage": 10
+   },
+   {
+       "name": "orc",
+       "sprite": 8,
+       "hp": 40,
+       "speed": 6,
+       "damage": 12
    }
  
 ]
