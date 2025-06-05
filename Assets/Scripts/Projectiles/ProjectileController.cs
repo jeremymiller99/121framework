@@ -8,10 +8,67 @@ public class ProjectileController : MonoBehaviour
     public event Action<Hittable,Vector3> OnHit;
     public ProjectileMovement movement;
     
+    // Visual enhancement for fast projectiles
+    private TrailRenderer trail;
+    private SpriteRenderer spriteRenderer;
+    private float originalSpeed;
+    
+    [Header("Debug")]
+    public bool showSpeedDebug = false;
+    
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        // Setup visual enhancements based on projectile speed
+        if (movement != null)
+        {
+            originalSpeed = movement.speed;
+            SetupVisualEnhancements();
+            
+            // Debug output for speed capping
+            if (showSpeedDebug && originalSpeed != movement.displaySpeed)
+            {
+                Debug.Log($"Projectile speed capped: {originalSpeed:F1} -> {movement.displaySpeed:F1} (Reduction: {((originalSpeed - movement.displaySpeed) / originalSpeed * 100):F1}%)");
+            }
+        }
+    }
+
+    void SetupVisualEnhancements()
+    {
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        var settings = ProjectileSettings.Instance;
         
+        // Add trail for fast projectiles
+        if (originalSpeed > settings.trailSpeedThreshold)
+        {
+            trail = gameObject.AddComponent<TrailRenderer>();
+            trail.material = new Material(Shader.Find("Sprites/Default"));
+            trail.startColor = settings.normalTrailColor;
+            trail.endColor = new Color(settings.normalTrailColor.r, settings.normalTrailColor.g, settings.normalTrailColor.b, 0f);
+            trail.startWidth = settings.normalTrailWidth;
+            trail.endWidth = settings.normalTrailWidth * 0.3f;
+            trail.time = settings.normalTrailTime;
+            trail.minVertexDistance = 0.1f;
+            
+            // Make very fast projectiles more visible
+            if (originalSpeed > settings.enhancedVisibilityThreshold)
+            {
+                // Increase sprite brightness/alpha for extremely fast projectiles
+                if (spriteRenderer != null)
+                {
+                    Color spriteColor = spriteRenderer.color;
+                    spriteColor.a = Mathf.Min(1.5f, spriteColor.a * 1.5f);
+                    spriteRenderer.color = spriteColor;
+                }
+                
+                // Longer, brighter trail
+                trail.startWidth = settings.fastTrailWidth;
+                trail.endWidth = settings.fastTrailWidth * 0.4f;
+                trail.time = settings.fastTrailTime;
+                trail.startColor = settings.fastTrailColor;
+                trail.endColor = new Color(settings.fastTrailColor.r, settings.fastTrailColor.g, settings.fastTrailColor.b, 0f);
+            }
+        }
     }
 
     // Update is called once per frame
@@ -19,7 +76,6 @@ public class ProjectileController : MonoBehaviour
     {
         movement.Movement(transform);
     }
-
 
     private void OnCollisionEnter2D(Collision2D collision)
     {

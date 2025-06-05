@@ -483,6 +483,16 @@ public class EnemySpawner : MonoBehaviour
         // Stop all coroutines to prevent any lingering processes
         StopAllCoroutines();
         
+        // Reset the player completely first
+        if (GameManager.Instance.player != null)
+        {
+            var playerController = GameManager.Instance.player.GetComponent<PlayerController>();
+            if (playerController != null)
+            {
+                playerController.ResetPlayer();
+            }
+        }
+        
         // Clear all enemies from the game
         var allEnemies = FindObjectsOfType<EnemyController>();
         foreach (var enemy in allEnemies)
@@ -503,6 +513,13 @@ public class EnemySpawner : MonoBehaviour
         // Reset GameManager state properly
         GameManager.Instance.state = GameManager.GameState.PREGAME;
         GameManager.Instance.countdown = 0;
+        
+        // Reset spell reward manager state
+        var spellRewardManager = FindObjectOfType<SpellRewardManager>();
+        if (spellRewardManager != null)
+        {
+            spellRewardManager.ResetState();
+        }
         
         // Hide ALL UI elements immediately
         HideAllGameUI();
@@ -537,6 +554,14 @@ public class EnemySpawner : MonoBehaviour
     {
         Debug.Log("Hiding all game UI elements");
         
+        // Hide spell reward UI if it exists
+        var spellRewardManager = FindObjectOfType<SpellRewardManager>();
+        if (spellRewardManager != null && spellRewardManager.spellRewardPanel != null)
+        {
+            spellRewardManager.spellRewardPanel.SetActive(false);
+            Debug.Log("Hidden spell reward panel during game UI cleanup");
+        }
+        
         // Only hide waveInfoText when completely exiting the game
         if (waveInfoText != null)
             waveInfoText.gameObject.SetActive(false);
@@ -550,6 +575,9 @@ public class EnemySpawner : MonoBehaviour
             gameOverPanel.SetActive(false);
         if (victoryPanel != null)
             victoryPanel.SetActive(false);
+            
+        // Force UI refresh to ensure all changes are applied
+        Canvas.ForceUpdateCanvases();
     }
 
     void ReturnToMenu()
@@ -562,6 +590,31 @@ public class EnemySpawner : MonoBehaviour
     public void NextWave()
     {
         Debug.Log("NextWave button pressed!");
+        
+        // Check if spell reward manager is waiting for player choice
+        var spellRewardManager = FindObjectOfType<SpellRewardManager>();
+        if (spellRewardManager != null && spellRewardManager.IsWaitingForChoice())
+        {
+            Debug.Log("Spell reward manager is waiting for choice, not proceeding to next wave yet");
+            return;
+        }
+        
+        // First, hide any UI that might still be showing from spell rewards
+        HideAllInteractionUI();
+        
+        // Check if we need to show a spell reward first
+        if (spellRewardManager != null && GameManager.Instance.state == GameManager.GameState.WAVEEND)
+        {
+            Debug.Log("Showing spell reward before proceeding to next wave");
+            spellRewardManager.ShowSpellReward();
+            
+            // If spell reward is now showing, return and wait for player choice
+            if (spellRewardManager.IsWaitingForChoice())
+            {
+                Debug.Log("Spell reward is now showing, waiting for player choice");
+                return;
+            }
+        }
         
         // Hide continue button and wave completion message
         if (continueButton != null)
@@ -578,5 +631,32 @@ public class EnemySpawner : MonoBehaviour
             
         // Signal that we can continue
         waitingForContinue = false;
+        
+        Debug.Log("NextWave completed - proceeding to next wave");
+    }
+    
+    // Helper method to hide all interaction UI elements
+    void HideAllInteractionUI()
+    {
+        Debug.Log("Hiding all interaction UI elements");
+        
+        // Hide spell reward UI if it's still showing
+        var spellRewardManager = FindObjectOfType<SpellRewardManager>();
+        if (spellRewardManager != null && spellRewardManager.spellRewardPanel != null)
+        {
+            spellRewardManager.spellRewardPanel.SetActive(false);
+            Debug.Log("Force hidden spell reward panel");
+        }
+        
+        // Hide continue button
+        if (continueButton != null)
+            continueButton.SetActive(false);
+            
+        // Hide level info text
+        if (levelInfoText != null)
+            levelInfoText.gameObject.SetActive(false);
+        
+        // Force UI refresh
+        Canvas.ForceUpdateCanvases();
     }
 }

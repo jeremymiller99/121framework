@@ -2,30 +2,30 @@
    {
        "name": "zombie",
        "sprite": 0,
-       "hp": 20,
-       "speed": 5,
-       "damage": 5
+       "hp": 35,
+       "speed": 4,
+       "damage": 8
    },
    {
        "name": "skeleton",
        "sprite": 1,
-       "hp": 30,
-       "speed": 7,
-       "damage": 10
+       "hp": 50,
+       "speed": 6,
+       "damage": 12
    },  
    {
        "name": "warlock",
        "sprite": 19,
-       "hp": 30,
-       "speed": 7,
-       "damage": 10
+       "hp": 45,
+       "speed": 5,
+       "damage": 15
    },
    {
        "name": "orc",
        "sprite": 8,
-       "hp": 40,
-       "speed": 6,
-       "damage": 12
+       "hp": 70,
+       "speed": 4,
+       "damage": 18
    }
  
 ]

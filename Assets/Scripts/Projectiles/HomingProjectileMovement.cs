@@ -22,7 +22,7 @@ public class HomingProjectileMovement : ProjectileMovement
         {
             Vector3 direction = transform.rotation * new Vector3(1, 0, 0);
             angle = Mathf.Atan2(direction.y, direction.x);
-            transform.Translate(new Vector3(speed * Time.deltaTime, 0, 0), Space.Self);
+            transform.Translate(new Vector3(displaySpeed * Time.deltaTime, 0, 0), Space.Self);
         }
         else
         {
@@ -43,7 +43,7 @@ public class HomingProjectileMovement : ProjectileMovement
 
             }
             Vector3 direction = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0);
-            transform.Translate(direction.normalized * speed * Time.deltaTime, Space.World);
+            transform.Translate(direction.normalized * displaySpeed * Time.deltaTime, Space.World);
         }
     }
 }
