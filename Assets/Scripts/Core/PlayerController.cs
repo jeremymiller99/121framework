@@ -19,12 +19,14 @@ public class PlayerController : MonoBehaviour
 
     public Unit unit;
     private bool isDead = false; // Prevent multiple death calls
+    private Vector3 lastPosition;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         unit = GetComponent<Unit>();
         GameManager.Instance.player = gameObject;
+        lastPosition = transform.position;
     }
 
     public void StartLevel()
@@ -33,17 +35,29 @@ public class PlayerController : MonoBehaviour
         
         isDead = false; // Reset death state when starting a new level
         
-        // Calculate player stats based on wave (using mage class stats)
-        var variables = new Dictionary<string, int>
-        {
-            ["wave"] = currentWave
-        };
+        // Calculate player stats based on selected character class
+        CharacterClass selectedClass = CharacterClassManager.Instance?.GetSelectedClass();
+        int playerHp, playerMana, playerManaReg, playerSpellPower;
         
-        int playerHp = RPNEvaluator.Evaluate("95 wave 12 * + wave wave * 2 * +", variables);
-        int playerMana = RPNEvaluator.Evaluate("90 wave 15 * + wave wave * 3 * +", variables);
-        int playerManaReg = RPNEvaluator.Evaluate("10 wave 2 * + wave 10 / +", variables);
-        int playerSpellPower = RPNEvaluator.Evaluate("wave 12 *", variables);
-        speed = RPNEvaluator.Evaluate("5 wave 15 / +", variables);
+        if (selectedClass == null)
+        {
+            Debug.LogWarning("No character class selected, using default mage stats");
+            // Fall back to hardcoded mage stats
+            var variables = new Dictionary<string, int> { ["wave"] = currentWave };
+            playerHp = RPNEvaluator.Evaluate("95 wave 12 * + wave wave * 2 * +", variables);
+            playerMana = RPNEvaluator.Evaluate("90 wave 15 * + wave wave * 3 * +", variables);
+            playerManaReg = RPNEvaluator.Evaluate("10 wave 2 * + wave 10 / +", variables);
+            playerSpellPower = RPNEvaluator.Evaluate("wave 12 *", variables);
+            speed = RPNEvaluator.Evaluate("5 wave 15 / +", variables);
+        }
+        else
+        {
+            playerHp = selectedClass.CalculateHealth(currentWave);
+            playerMana = selectedClass.CalculateMana(currentWave);
+            playerManaReg = selectedClass.CalculateManaRegeneration(currentWave);
+            playerSpellPower = selectedClass.CalculateSpellPower(currentWave);
+            speed = selectedClass.CalculateSpeed(currentWave);
+        }
         
         // Create or update spell caster
         if (spellcaster == null)
@@ -133,8 +147,15 @@ public class PlayerController : MonoBehaviour
             hp = null;
         }
         
+        // Clear all relics
+        if (RelicManager.Instance != null)
+        {
+            RelicManager.Instance.ClearAllRelics();
+        }
+        
         // Reset position to starting position (0,0,0)
         transform.position = Vector3.zero;
+        lastPosition = Vector3.zero;
         
         // Reset movement
         if (unit != null)
@@ -158,7 +179,12 @@ public class PlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        
+        // Track player movement for relic system
+        if (Vector3.Distance(transform.position, lastPosition) > 0.1f)
+        {
+            EventBus.Instance.FirePlayerMove(transform.position);
+            lastPosition = transform.position;
+        }
     }
 
     void OnAttack(InputValue value)
@@ -167,6 +193,8 @@ public class PlayerController : MonoBehaviour
         Vector2 mouseScreen = Mouse.current.position.value;
         Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(mouseScreen);
         mouseWorld.z = 0;
+        
+        // SpellCaster.Cast() will handle firing the spell cast event after applying relic modifiers
         StartCoroutine(spellcaster.Cast(transform.position, mouseWorld));
     }
 

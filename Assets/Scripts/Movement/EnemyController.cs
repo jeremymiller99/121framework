@@ -48,6 +48,14 @@ public class EnemyController : MonoBehaviour
         if (!dead)
         {
             dead = true;
+            
+            // Fire enemy killed event for relic system
+            var player = GameManager.Instance?.player?.GetComponent<PlayerController>();
+            if (player?.hp != null)
+            {
+                EventBus.Instance.FireEnemyKilled(player.hp, hp);
+            }
+            
             GameManager.Instance.RemoveEnemy(gameObject);
             Destroy(gameObject);
         }

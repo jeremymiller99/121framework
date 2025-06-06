@@ -111,8 +111,21 @@ public class SpellCaster
         if (currentSpell != null && mana >= currentSpell.GetManaCost() && currentSpell.IsReady())
         {
             mana -= currentSpell.GetManaCost();
+            
+            // Apply any active relic effects that modify the next spell
+            ApplyNextSpellRelicEffects(currentSpell);
+            
+            // Fire spell cast event
+            EventBus.Instance.FireSpellCast(currentSpell, where, target);
+            
             yield return currentSpell.Cast(where, target, team);
         }
         yield break;
+    }
+
+    private void ApplyNextSpellRelicEffects(Spell spell)
+    {
+        // Apply next spell modifiers from relics (like Golden Mask)
+        NextSpellModifierManager.ApplyAndClearModifiers(spell);
     }
 }

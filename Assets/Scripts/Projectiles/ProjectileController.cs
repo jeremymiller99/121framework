@@ -31,6 +31,12 @@ public class ProjectileController : MonoBehaviour
                 Debug.Log($"Projectile speed capped: {originalSpeed:F1} -> {movement.displaySpeed:F1} (Reduction: {((originalSpeed - movement.displaySpeed) / originalSpeed * 100):F1}%)");
             }
         }
+        else
+        {
+            Debug.LogError($"ProjectileController on {gameObject.name} has no ProjectileMovement component assigned! This projectile will be destroyed.");
+            // Set a short lifetime to destroy this broken projectile
+            SetLifetime(0.1f);
+        }
     }
 
     void SetupVisualEnhancements()
@@ -74,7 +80,16 @@ public class ProjectileController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        movement.Movement(transform);
+        if (movement != null)
+        {
+            movement.Movement(transform);
+        }
+        else
+        {
+            // If no movement component, projectile should be destroyed or given default behavior
+            Debug.LogWarning($"ProjectileController on {gameObject.name} has null movement component!");
+            Destroy(gameObject);
+        }
     }
 
     private void OnCollisionEnter2D(Collision2D collision)

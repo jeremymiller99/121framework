@@ -117,13 +117,57 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
+        // Hide level selector first
+        level_selector.gameObject.SetActive(false);
+        
+        // Debug: Check instances
+        Debug.Log($"ClassSelectionUI.Instance: {(ClassSelectionUI.Instance != null ? "Found" : "NULL")}");
+        Debug.Log($"CharacterClassManager.Instance: {(CharacterClassManager.Instance != null ? "Found" : "NULL")}");
+        if (CharacterClassManager.Instance != null)
+        {
+            Debug.Log($"Selected class: {(CharacterClassManager.Instance.GetSelectedClass() != null ? CharacterClassManager.Instance.GetSelectedClass().name : "NULL")}");
+        }
+        
+        // Check if player has selected a class - if not, show class selection
+        if (ClassSelectionUI.Instance != null && !ClassSelectionUI.Instance.IsClassSelected())
+        {
+            Debug.Log("No class selected - showing class selection UI");
+            ClassSelectionUI.Instance.ShowClassSelection();
+            
+            // Start coroutine to wait for class selection, then start the level
+            StartCoroutine(WaitForClassSelectionThenStartLevel());
+        }
+        else if (ClassSelectionUI.Instance == null)
+        {
+            Debug.LogError("ClassSelectionUI.Instance is NULL! Cannot show class selection.");
+            // Try to proceed anyway for now
+            StartLevelAfterClassSelection();
+        }
+        else
+        {
+            Debug.Log("Class already selected, proceeding directly to level start");
+            // Class already selected, proceed directly to starting the level
+            StartLevelAfterClassSelection();
+        }
+    }
+    
+    IEnumerator WaitForClassSelectionThenStartLevel()
+    {
+        // Wait until a class is selected
+        yield return new WaitUntil(() => ClassSelectionUI.Instance != null && ClassSelectionUI.Instance.IsClassSelected());
+        
+        Debug.Log("Class selection completed - starting level");
+        StartLevelAfterClassSelection();
+    }
+    
+    void StartLevelAfterClassSelection()
+    {
         // Reset all game state
         currentWave = 1;
         gameInProgress = true;
         waitingForContinue = false;
         
-        // Hide level selector and all game UI
-        level_selector.gameObject.SetActive(false);
+        // Hide all UI elements
         HideAllGameUI();
         
         // Reset GameManager state
@@ -135,7 +179,7 @@ public class EnemySpawner : MonoBehaviour
         // Start the player
         GameManager.Instance.player.GetComponent<PlayerController>().StartLevel();
         
-        Debug.Log($"Starting level coroutine for {levelname}, wave 1");
+        Debug.Log($"Starting level coroutine for {currentLevel.name}, wave 1");
         StartCoroutine(RunLevel());
     }
 
@@ -170,6 +214,10 @@ public class EnemySpawner : MonoBehaviour
         while (gameInProgress)
         {
             Debug.Log($"Starting wave {currentWave}");
+            
+            // Fire wave start event for relic system
+            EventBus.Instance.FireWaveStart(currentWave);
+            
             yield return StartCoroutine(SpawnWave());
             
             // Wait for all enemies to be defeated
@@ -177,6 +225,9 @@ public class EnemySpawner : MonoBehaviour
             
             GameManager.Instance.state = GameManager.GameState.WAVEEND;
             Debug.Log($"Wave {currentWave} completed");
+            
+            // Fire wave complete event for relic system
+            EventBus.Instance.FireWaveComplete(currentWave);
             
             // Check win condition for Easy and Medium modes
             if (currentLevel.waves > 0 && currentWave >= currentLevel.waves)
@@ -504,6 +555,20 @@ public class EnemySpawner : MonoBehaviour
             }
         }
         
+        // Reset character class selection so player can choose again
+        if (CharacterClassManager.Instance != null)
+        {
+            CharacterClassManager.Instance.ClearSelection();
+            Debug.Log("Character class selection cleared for restart");
+        }
+        
+        // Reset relic system
+        if (RelicManager.Instance != null)
+        {
+            RelicManager.Instance.ClearAllRelics();
+            Debug.Log("All relics cleared for restart");
+        }
+        
         // Reset ALL game state
         gameInProgress = false;
         waitingForContinue = false;
@@ -523,6 +588,18 @@ public class EnemySpawner : MonoBehaviour
         
         // Hide ALL UI elements immediately
         HideAllGameUI();
+        
+        // Hide class selection UI if it's showing
+        if (ClassSelectionUI.Instance != null)
+        {
+            ClassSelectionUI.Instance.HideClassSelection();
+        }
+        
+        // Hide relic selection UI if it's showing
+        if (RelicSelectionUI.Instance != null)
+        {
+            RelicSelectionUI.Instance.HideRelicSelection();
+        }
         
         // Reset any UI controllers that might be cached
         ResetUIControllers();
@@ -596,6 +673,13 @@ public class EnemySpawner : MonoBehaviour
         if (spellRewardManager != null && spellRewardManager.IsWaitingForChoice())
         {
             Debug.Log("Spell reward manager is waiting for choice, not proceeding to next wave yet");
+            return;
+        }
+        
+        // Check if relic selection UI is waiting for player choice
+        if (RelicSelectionUI.Instance != null && RelicSelectionUI.Instance.IsWaitingForSelection())
+        {
+            Debug.Log("Relic selection UI is waiting for choice, not proceeding to next wave yet");
             return;
         }
         
